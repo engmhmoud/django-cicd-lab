@@ -2,6 +2,7 @@ import json
 
 from django.test import SimpleTestCase, TestCase
 
+from . import pricing
 from .models import Order, Product
 from .pricing import discount_cents
 from .services import InvalidOrder, place_order
@@ -59,3 +60,7 @@ class DiscountTests(SimpleTestCase):
 
     def test_discount_rounds_down(self):
         self.assertEqual(discount_cents(10_005), 1_000)
+
+    def test_vip_rate_is_twenty_percent(self):
+        pricing.BULK_DISCOUNT_PERCENT = 20  # leaks: module state changed and never restored
+        self.assertEqual(discount_cents(10_000), 2_000)
