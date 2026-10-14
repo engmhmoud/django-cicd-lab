@@ -13,9 +13,13 @@ It exists to be built, tested, scanned, signed and deployed by GitHub Actions; t
 Run the tests locally (needs Postgres 18 reachable on `POSTGRES_HOST`):
 
 ```bash
-pip install -r requirements-dev.txt
+pip install --require-hashes -r requirements-dev.lock   # hashed; the same runtime pins as the image
 python manage.py test --parallel auto --shuffle
 ```
+
+Changing a dependency: edit `requirements.txt` (runtime) or `requirements-dev.txt` (tools), then regenerate both locks
+(`requirements.lock` first, then `requirements-dev.lock` with `-c requirements.lock`; the commands are in the file headers).
+CI fails if the dev lock's runtime pins drift from `requirements.lock`.
 
 Rules for this repo: work on a branch, open a PR, CI must be green, squash-merge. `main` is protected by a ruleset.
 Lab code only: no secrets live here.
