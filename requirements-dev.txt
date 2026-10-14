@@ -2,3 +2,4 @@
 ruff==0.17.0
 tblib==3.2.2          # readable tracebacks with `manage.py test --parallel`
 coverage==7.16.2      # test coverage (Lab 3 gate)
+django-migration-linter==6.0.0   # lints migrations for N-1 breakage (declares Django <=6.0; verified on 6.1.2)
