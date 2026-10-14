@@ -39,6 +39,12 @@ on:
 permissions:
   contents: read            # jobs raise only what they need
 
+# `shell: bash` = bash --noprofile --norc -eo pipefail. GitHub's implicit default is `bash -e` WITHOUT pipefail,
+# so `cosign verify ... | jq` would pass when cosign fails (Lab 8 found exactly this: an unsigned digest got deployed).
+defaults:
+  run:
+    shell: bash
+
 env:
   IMAGE: ghcr.io/engmhmoud/django-cicd-lab
   COSIGN_VERSION: v3.1.3
