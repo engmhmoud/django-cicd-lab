@@ -1,4 +1,5 @@
-# Runtime dependencies, pinned exactly (Lab 4 adds hashes / a lock file).
+# Runtime dependencies (the human-edited input). The image installs requirements.lock, generated from this
+# file with hashes: uv pip compile requirements.txt --generate-hashes --universal --python-version 3.14 -o requirements.lock
 Django==6.1.2
 gunicorn==26.2.0
 psycopg[binary]==3.3.6
