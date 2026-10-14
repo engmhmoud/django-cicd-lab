@@ -1,8 +1,9 @@
 import json
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from .models import Order, Product
+from .pricing import discount_cents
 from .services import InvalidOrder, place_order
 
 
@@ -47,3 +48,14 @@ class EndpointTests(TestCase):
     def test_bad_body_is_422(self):
         response = self.client.post("/api/orders", "{}", content_type="application/json")
         self.assertEqual(response.status_code, 422)
+
+
+class DiscountTests(SimpleTestCase):
+    def test_no_discount_below_threshold(self):
+        self.assertEqual(discount_cents(9_999), 0)
+
+    def test_discount_starts_at_threshold(self):
+        self.assertEqual(discount_cents(10_000), 1_000)
+
+    def test_discount_rounds_down(self):
+        self.assertEqual(discount_cents(10_005), 1_000)
