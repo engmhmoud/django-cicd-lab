@@ -1,4 +1,4 @@
-# Lab 4 demo: two deliberately unsafe patterns for the auditors to catch. Never merged; manual trigger only.
+# Lab 4 demo, fixed: the action is pinned by SHA and the untrusted value reaches the shell as data. Never merged.
 name: lab04-unsafe-demo
 on:
   workflow_dispatch:
@@ -9,10 +9,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7          # unpinned: a mutable tag
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Echo the PR title
-        # untrusted input pasted straight into a shell script
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}   # expanded into an env var, not into the script
         run: |
-          echo "PR title is ${{ github.event.pull_request.title }}"
+          echo "PR title is ${PR_TITLE}"
