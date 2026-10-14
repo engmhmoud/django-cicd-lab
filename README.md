@@ -23,3 +23,9 @@ Lab code only: no secrets live here.
 ## Running the tests
 
 `python manage.py test --parallel auto --shuffle` (needs a Postgres; CI uses a `postgres:18.6` service container).
+
+## CI concurrency
+
+PR runs share a group per branch, so a new push cancels the old run. Pushes to `main` get one group per commit, so
+every merged commit gets its own CI result: a shared group keeps only one *pending* run, and a burst of merges would
+cancel the middle commit's run even with `cancel-in-progress: false`.
