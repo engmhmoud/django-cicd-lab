@@ -1,0 +1,104 @@
+# Lab 8 (learning/013 ch05): continuous deployment with gates and an automatic rollback.
+# push to main → build ONE image → staging (deploy, smoke test) → production (wait timer, branch policy,
+# deploy the SAME digest, smoke test). Each environment is rebuilt inside this ephemeral runner from its
+# last-known-good digest (registry tag cd-<env>) and then upgraded: see deploy/deploy.sh.
+name: lab08-cd
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      break_production_smoke:
+        description: "Lab only: make the production smoke test expect a wrong SHA, to exercise the rollback"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read            # jobs raise only what they need
+
+concurrency:
+  group: lab08-cd           # one deployment at a time; never cancel a deploy halfway
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/engmhmoud/django-cicd-lab
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to 26.04 between Oct 19 and Nov 19, 2026
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write       # push the image to GHCR
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:cd-${{ github.sha }}
+          build-args: |
+            APP_VERSION=cd
+            GIT_SHA=${{ github.sha }}
+          provenance: false # one plain manifest per build; signing and attestations are Lab 4's job
+          sbom: false
+
+  staging:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: staging
+    permissions:
+      contents: read
+      packages: write       # pull the image and move the cd-staging pointer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy, smoke test, roll back on failure
+        env:
+          NEW_REF: ${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: sh deploy/deploy.sh staging "$NEW_REF" "$EXPECTED_SHA"
+
+  production:
+    needs: [build, staging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production      # protected: wait timer + main-only deployment branch policy (set via the API)
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy the same digest, smoke test, roll back on failure
+        env:
+          NEW_REF: ${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
+          EXPECTED_SHA: ${{ inputs.break_production_smoke && 'deliberately-wrong-sha' || github.sha }}
+        run: sh deploy/deploy.sh production "$NEW_REF" "$EXPECTED_SHA"
