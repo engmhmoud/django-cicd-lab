@@ -12,8 +12,12 @@ permissions:
   contents: read            # least privilege for GITHUB_TOKEN; jobs ask for more only if they need it
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}   # a new push to a PR cancels the old run; main runs finish
+  # PRs: one group per branch, a new push cancels the old run. Pushes to main and merge-queue runs: one group PER COMMIT.
+  # (A shared group on main would keep only ONE pending run: a third quick merge cancels the second commit's run,
+  # even with cancel-in-progress: false. `queue: max` is the other fix, but it can't be combined with
+  # cancel-in-progress: true in the same block.)
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:                  # decides inside the workflow; a job skipped by `if:` reports "Success" to required checks
@@ -32,8 +36,9 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          # fail closed: if the file list can't be read, run everything (a failed `changes` job would SKIP lint/test,
-          # and skipped jobs count as passing required checks)
+          # fail closed, step level: if the file list can't be read, run everything. The JOB level is covered by the
+          # `if:` on lint/test/compat: they are skipped ONLY when `changes` succeeded AND said code=false. A failed or
+          # timed-out `changes` job (whatever its output) makes them run; `!cancelled()` stops `needs` from skipping them.
           files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename') || { echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; }
           printf '%s\n' "$files"
           if printf '%s\n' "$files" | grep -qvE '\.md$'; then code=true; else code=false; fi
@@ -41,7 +46,7 @@ jobs:
 
   lint:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -52,14 +57,20 @@ jobs:
         with:
           python-version: "3.14.8"
           cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - run: pip install -r requirements-dev.txt
+          cache-dependency-path: requirements-dev.lock   # the key changes when ANY pin changes (runtime or dev)
+      - run: pip install --require-hashes -r requirements-dev.lock   # the same runtime pins the image installs
+      - name: Dev lock uses the image's runtime pins
+        run: |
+          # requirements-dev.lock is compiled with `-c requirements.lock`; fail if someone edited one without the other
+          grep -oE '^[a-z0-9._-]+==[^ ;]+' requirements.lock | while read -r pin; do
+            grep -qE "^${pin} " requirements-dev.lock || { echo "drift: $pin not in requirements-dev.lock"; exit 1; }
+          done
       - run: ruff check .
       - run: ruff format --check .
 
   test:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
@@ -83,8 +94,8 @@ jobs:
         with:
           python-version: "3.14.8"
           cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - run: pip install -r requirements-dev.txt
+          cache-dependency-path: requirements-dev.lock   # the key changes when ANY pin changes (runtime or dev)
+      - run: pip install --require-hashes -r requirements-dev.lock   # the same runtime pins the image installs
       - name: Migrations are committed
         run: python manage.py makemigrations --check --dry-run
       - name: Tests
@@ -102,7 +113,7 @@ jobs:
 
   compat:                    # NOT a required check. Matrix check names look like "compat (3.14.8, 17.11)".
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
@@ -131,6 +142,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - run: pip install -r requirements-dev.txt
+          cache-dependency-path: requirements-dev.lock   # the key changes when ANY pin changes (runtime or dev)
+      - run: pip install --require-hashes -r requirements-dev.lock   # the same runtime pins the image installs
       - run: python manage.py test --parallel auto
