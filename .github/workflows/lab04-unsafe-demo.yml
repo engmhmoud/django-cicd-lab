@@ -1,0 +1,18 @@
+# Lab 4 demo: two deliberately unsafe patterns for the auditors to catch. Never merged; manual trigger only.
+name: lab04-unsafe-demo
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  greet:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7          # unpinned: a mutable tag
+        with:
+          persist-credentials: false
+      - name: Echo the PR title
+        # untrusted input pasted straight into a shell script
+        run: |
+          echo "PR title is ${{ github.event.pull_request.title }}"
