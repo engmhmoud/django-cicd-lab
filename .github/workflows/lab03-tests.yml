@@ -114,7 +114,9 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           DJANGO_SETTINGS_MODULE: config.settings_lint
-        run: python manage.py lintmigrations --git-commit-id "$BASE_SHA"
+        # --project-root-path is required: by default the linter runs `git diff --relative` inside the SETTINGS folder
+        # (config/), finds 0 migrations and passes ("Valid migrations: 0/0") -- a green gate that checked nothing.
+        run: python manage.py lintmigrations --git-commit-id "$BASE_SHA" --project-root-path .
 
   timing:                    # manual: serial vs parallel, with and without a durable test database
     if: github.event_name == 'workflow_dispatch' && inputs.experiment == 'timing'
