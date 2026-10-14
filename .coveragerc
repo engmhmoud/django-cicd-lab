@@ -1,11 +1,16 @@
+# Coverage for the Lab 3 gate. Measures the code Lab 3 owns (orders/, config/); other labs' apps aren't gated here.
 [run]
-source = .
+source =
+    orders
+    config
 branch = true
+# Django's --parallel runs tests in worker processes; without these two lines their code shows as uncovered.
 parallel = true
 concurrency = multiprocessing
 omit =
     */migrations/*
-    manage.py
+    orders/heavy_checks.py
+    config/settings_lint.py
     config/wsgi.py
 
 [report]
