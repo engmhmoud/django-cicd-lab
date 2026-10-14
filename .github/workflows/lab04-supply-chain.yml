@@ -33,6 +33,7 @@ jobs:
       - name: actionlint (syntax, expressions, shellcheck)
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
       - name: zizmor (security audit, offline)
+        if: ${{ !cancelled() }}   # run even when actionlint failed: show every finding at once
         run: docker run --rm -v "$PWD:/repo:ro" ghcr.io/zizmorcore/zizmor@sha256:a2eb396d886c053073405c7a980f2139ba2248ec172243cfa3841e57196e8101 --offline --min-severity low /repo/.github/workflows
 
   pr-image-scan:
@@ -165,7 +166,7 @@ jobs:
           cosign verify "${IMAGE}@${DIGEST}" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity "https://github.com/engmhmoud/django-cicd-lab/.github/workflows/lab04-supply-chain.yml@refs/heads/main" \
-            | jq -r '.[0].optional | "verified: Subject=\(.Subject) Issuer=\(.Issuer)"'
+            | jq -r '.[] | "verified: \(.critical.type)  \(.critical.image["docker-manifest-digest"])"'
       - name: cosign verify (wrong identity → must fail)
         run: |
           if cosign verify "${IMAGE}@${DIGEST}" \
