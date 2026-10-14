@@ -3,8 +3,7 @@
 name: ci
 
 on:
-  pull_request:
-    paths-ignore: ["**/*.md"]   # LAB 2 PITFALL (on purpose): skip docs-only PRs at the workflow level
+  pull_request:               # no paths/paths-ignore here: a skipped WORKFLOW leaves required checks "Expected" forever
   push:
     branches: [main]
   merge_group:              # a merge queue (org-owned repos / Enterprise Cloud) tests PRs in merge order
@@ -17,8 +16,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}   # a new push to a PR cancels the old run; main runs finish
 
 jobs:
-  lint:
+  changes:                  # decides inside the workflow; a job skipped by `if:` reports "Success" to required checks
     runs-on: ubuntu-24.04   # pinned: ubuntu-latest moves to 26.04 between Oct 19 and Nov 19, 2026
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read   # to list the PR's files
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - id: diff
+        env:                # pass context through env, never ${{ }} inside the script (injection-safe)
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # fail closed: if the file list can't be read, run everything (a failed `changes` job would SKIP lint/test,
+          # and skipped jobs count as passing required checks)
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename') || { echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          printf '%s\n' "$files"
+          if printf '%s\n' "$files" | grep -qvE '\.md$'; then code=true; else code=false; fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
+  lint:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,6 +58,8 @@ jobs:
       - run: ruff format --check .
 
   test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
@@ -75,6 +101,8 @@ jobs:
           retention-days: 7
 
   compat:                    # NOT a required check. Matrix check names look like "compat (3.14.8, 17.11)".
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
