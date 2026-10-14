@@ -26,4 +26,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 \
   CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"]
 # exec form: gunicorn is PID 1 and gets SIGTERM directly (graceful shutdown, 005 ch04)
-CMD ["gunicorn", "config.wsgi", "--bind", "0.0.0.0:8000", "--workers", "2", "--graceful-timeout", "20", "--access-logfile", "-"]
+CMD ["gunicorn", "config.wsgi", "--bind", "127.0.0.1:8000", "--workers", "2", "--graceful-timeout", "20", "--access-logfile", "-"]
