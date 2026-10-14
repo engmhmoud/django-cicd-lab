@@ -20,6 +20,7 @@ class Order(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False)
     customer_email = models.EmailField()
+    currency = models.CharField(max_length=3)
     status = models.CharField(max_length=16, choices=Status, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
