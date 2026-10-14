@@ -1,0 +1,13 @@
+[run]
+source = .
+branch = true
+parallel = true
+concurrency = multiprocessing
+omit =
+    */migrations/*
+    manage.py
+    config/wsgi.py
+
+[report]
+show_missing = true
+skip_covered = true
