@@ -4,6 +4,7 @@ name: ci
 
 on:
   pull_request:
+    paths-ignore: ["**/*.md"]   # LAB 2 PITFALL (on purpose): skip docs-only PRs at the workflow level
   push:
     branches: [main]
   merge_group:              # a merge queue (org-owned repos / Enterprise Cloud) tests PRs in merge order
