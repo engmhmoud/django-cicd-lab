@@ -1,0 +1,48 @@
+# Lab 7: cut a release from main. The version and the notes come from Conventional Commits
+# (squash-merge titles) since the last v* tag; the job creates the tag and a GitHub Release.
+name: lab07-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only compute the version and the notes (no tag, no release)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release            # never two releases at once
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write       # this job only: create the tag and the release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0    # full history and tags: the version is computed from them
+          persist-credentials: false
+      - name: Next version from Conventional Commits
+        id: version
+        run: python3 .github/scripts/next_version.py >> "$GITHUB_OUTPUT"
+      - name: Show the plan
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+          BUMP: ${{ steps.version.outputs.bump }}
+        run: |
+          echo "previous=$PREVIOUS bump=$BUMP next=$TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+          cat notes.md | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Create the tag and the GitHub Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md

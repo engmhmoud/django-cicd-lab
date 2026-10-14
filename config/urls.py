@@ -8,4 +8,5 @@ urlpatterns = [
     path("version", views.version),
     path("api/orders", views.orders),
     path("api/orders/<uuid:order_id>", views.order_detail),
+    path("api/quote", views.quote),
 ]

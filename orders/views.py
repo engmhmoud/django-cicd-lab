@@ -8,7 +8,10 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
+from flags.service import is_enabled
+
 from .models import Order
+from .pricing import discount_cents, discount_cents_v2
 from .services import InvalidOrder, place_order
 
 
@@ -64,3 +67,17 @@ def orders(request):
 def order_detail(request, order_id):
     order = get_object_or_404(Order.objects.prefetch_related("lines"), pk=order_id)
     return JsonResponse(_order_json(order))
+
+
+@require_GET
+def quote(request):
+    """Discount quote. Pricing v2 is behind the new_pricing flag: deployed dark, released per customer."""
+    try:
+        customer, total = request.GET["customer"], int(request.GET["total_cents"])
+    except KeyError, ValueError:
+        return JsonResponse({"error": "customer and total_cents are required"}, status=422)
+    if is_enabled("new_pricing", customer):
+        engine, discount = "v2", discount_cents_v2(total)
+    else:
+        engine, discount = "v1", discount_cents(total)
+    return JsonResponse({"customer": customer, "total_cents": total, "discount_cents": discount, "engine": engine})
