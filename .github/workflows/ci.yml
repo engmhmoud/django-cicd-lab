@@ -73,7 +73,7 @@ jobs:
           path: reports/
           retention-days: 7
 
-  compat:                    # NOT a required check: a matrix job's check names are "compat (3.14.8, 17.11)" etc.
+  compat:                    # NOT a required check. Matrix check names look like "compat (3.14.8, 17.11)".
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
