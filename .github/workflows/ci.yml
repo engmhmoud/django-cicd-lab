@@ -35,6 +35,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
+          echo "LAB DEMO: simulate a broken changes job"; exit 1
           if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           # fail closed, step level: if the file list can't be read, run everything. The JOB level is covered by the
           # `if:` on lint/test/compat: they are skipped ONLY when `changes` succeeded AND said code=false. A failed or
