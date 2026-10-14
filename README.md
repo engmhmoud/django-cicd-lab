@@ -19,3 +19,7 @@ python manage.py test --parallel auto --shuffle
 
 Rules for this repo: work on a branch, open a PR, CI must be green, squash-merge. `main` is protected by a ruleset.
 Lab code only: no secrets live here.
+
+## Running the tests
+
+`python manage.py test --parallel auto --shuffle` (needs a Postgres; CI uses a `postgres:18.6` service container).
