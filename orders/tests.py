@@ -1,4 +1,5 @@
 import json
+from unittest import mock
 
 from django.test import SimpleTestCase, TestCase
 
@@ -62,5 +63,5 @@ class DiscountTests(SimpleTestCase):
         self.assertEqual(discount_cents(10_005), 1_000)
 
     def test_vip_rate_is_twenty_percent(self):
-        pricing.BULK_DISCOUNT_PERCENT = 20  # leaks: module state changed and never restored
-        self.assertEqual(discount_cents(10_000), 2_000)
+        with mock.patch.object(pricing, "BULK_DISCOUNT_PERCENT", 20):  # restored when the block exits
+            self.assertEqual(discount_cents(10_000), 2_000)
