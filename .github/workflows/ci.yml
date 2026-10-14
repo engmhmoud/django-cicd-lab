@@ -1,17 +1,19 @@
-# Commit stage: fast feedback on every PR and every push to main (owned by Lab 2; later labs add their own files).
+# Commit stage: fast feedback on every PR and on every push to main (owned by Lab 2; later labs add their own files).
+# Required checks (ruleset on main): `lint` and `test`. Do not rename those jobs (the ruleset matches names).
 name: ci
 
 on:
   pull_request:
   push:
     branches: [main]
+  merge_group:              # a merge queue (org-owned repos / Enterprise Cloud) tests PRs in merge order
 
 permissions:
   contents: read            # least privilege for GITHUB_TOKEN; jobs ask for more only if they need it
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}   # a new push to a PR cancels the old run; main runs finish
 
 jobs:
   lint:
@@ -59,4 +61,47 @@ jobs:
       - name: Migrations are committed
         run: python manage.py makemigrations --check --dry-run
       - name: Tests
-        run: python manage.py test --parallel auto --shuffle
+        run: |
+          mkdir -p reports
+          python manage.py test --parallel auto --shuffle --durations 5 2>&1 | tee reports/test-output.txt
+          exit "${PIPESTATUS[0]}"
+      - name: Keep the test report
+        if: ${{ !cancelled() }}         # upload on success and on failure, not when the run was cancelled
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-report
+          path: reports/
+          retention-days: 7
+
+  compat:                    # NOT a required check. Matrix check names look like "compat (3.14.8, 17.11)".
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false       # show every failing combination, not just the first
+      matrix:
+        python: ["3.14.8"]   # 3.13 removed: the models use uuid.uuid7 (Python 3.14+); found by this matrix
+        postgres: ["16.15", "17.11", "18.6"]   # Django 6.1 supports PostgreSQL 15+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      POSTGRES_HOST: localhost
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python manage.py test --parallel auto
