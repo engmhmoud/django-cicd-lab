@@ -1,0 +1,3 @@
+-r requirements.txt
+ruff==0.17.0
+tblib==3.2.2          # readable tracebacks with `manage.py test --parallel`

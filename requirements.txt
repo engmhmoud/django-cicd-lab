@@ -1,0 +1,4 @@
+# Runtime dependencies, pinned exactly (Lab 4 adds hashes / a lock file).
+Django==6.1.2
+gunicorn==26.2.0
+psycopg[binary]==3.3.6
