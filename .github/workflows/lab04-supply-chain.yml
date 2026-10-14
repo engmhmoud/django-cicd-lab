@@ -1,6 +1,7 @@
 # Lab 4 (learning/013 ch04): build once, scan, push, sign, attest, SBOM, verify; plus a workflow audit.
 # PRs: build locally + scan (no registry writes). main: build + push to GHCR, scan the pushed digest,
-# then sign and attest it only if the scan passed. Deploys (Lab 8) use the signed digest.
+# then sign and attest it only if the scan passed, verify, and hand the SAME digest to the Lab 8 deploy
+# (lab08-cd.yml, a reusable workflow that runs cosign verify again before each environment).
 name: lab04-supply-chain
 
 on:
@@ -180,3 +181,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo engmhmoud/django-cicd-lab --format json | jq -r '.[0].verificationResult.statement.predicateType'
+
+  deploy:
+    name: deploy
+    needs: [release-image, verify]
+    permissions:
+      contents: read
+      packages: write       # the called workflow pulls the image and moves the cd-<env> pointers
+    # A local call runs this same commit's lab08-cd.yml. zizmor prefers GitHub's newer `$/` syntax (Jul 2026),
+    # but the pinned actionlint can't parse it yet, so the classic form stays (suppressed on purpose).
+    uses: ./.github/workflows/lab08-cd.yml # zizmor: ignore[self-repository]
+    with:
+      digest: ${{ needs.release-image.outputs.digest }}
+      expected_sha: ${{ github.sha }}
