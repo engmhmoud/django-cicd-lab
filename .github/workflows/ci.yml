@@ -1,4 +1,4 @@
-# Commit stage: fast feedback on every PR and every push to main (owned by Lab 2; later labs add their own files).
+# Commit stage: fast feedback on every PR and on every push to main (owned by Lab 2; later labs add their own files).
 # Required checks (ruleset on main): `lint` and `test`. Do not rename those jobs (the ruleset matches names).
 name: ci
 
