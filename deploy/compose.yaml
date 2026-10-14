@@ -1,6 +1,6 @@
 # One environment of the orders service (Lab 8). The CD workflow runs it inside the GitHub runner:
 #   IMAGE_REF=ghcr.io/<owner>/<repo>@sha256:... docker compose -p staging -f deploy/compose.yaml up -d --wait
-# The image is always referenced by DIGEST: the same bytes that passed the previous stage.
+# The image is always referenced by DIGEST: the signed bytes Lab 4 released, verified before deploy (ch04/ch05).
 
 services:
   db:
@@ -28,6 +28,7 @@ services:
   app:
     image: ${IMAGE_REF:?set IMAGE_REF to image@digest}
     environment: *env
+    stop_grace_period: 25s     # > gunicorn --graceful-timeout 20 (Dockerfile); Docker's default 10 s would SIGKILL first (005 ch04)
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}

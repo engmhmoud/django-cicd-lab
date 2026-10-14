@@ -6,9 +6,10 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN python -m venv /venv
 COPY requirements.lock /tmp/requirements.lock
 # Hash-checked install of the full lock (learning/013 ch04): a changed or swapped file fails the build.
+# --only-binary: wheels only, so no package's build code (setup.py) runs at install time (012 R-33).
 # pip is removed afterwards: the runtime never installs anything, and pip's vendored packages
 # (urllib3, msgpack, setuptools) were the only HIGH findings Trivy reported (Lab 4).
-RUN /venv/bin/pip install --require-hashes --no-deps -r /tmp/requirements.lock \
+RUN /venv/bin/pip install --require-hashes --no-deps --only-binary :all: -r /tmp/requirements.lock \
  && /venv/bin/pip uninstall --yes pip
 
 FROM python:3.14.8-slim-trixie AS runtime
